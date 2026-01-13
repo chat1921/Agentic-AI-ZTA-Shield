@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Login | Agentic AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f0f4f9;
+            --surface-color: #ffffff;
+            --text-color: #1f1f1f;
+            --secondary-text-color: #5f6368;
+            --border-color: #e0e0e0;
+            --gemini-gradient: linear-gradient(90deg, #4285F4, #9B59B6, #EA4335, #FBBC05);
+            --shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 2px 6px 2px rgba(60,64,67,0.15);
+        }
+        body {
+            font-family: 'Google Sans', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background: var(--surface-color);
+            padding: 40px 50px;
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            height: auto;
+        }
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-color);
+            margin-bottom: 30px;
+        }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        input, select {
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            background-color: #f0f4f9;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #4285F4;
+            box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.2);
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            background-image: var(--gemini-gradient);
+            background-size: 200%;
+            color: white;
+            font-size: 18px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-position 0.4s, opacity 0.2s;
+        }
+        button:hover { background-position: right; }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-image: linear-gradient(to right, #aaa, #ccc);
+        }
+        .error-message {
+            background-color: #fce8e6;
+            color: #c5221f;
+            padding: 12px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 14px;
+            border: 1px solid #f9ab9f;
+        }
+        .info-message {
+            background-color: #e6f7ff;
+            color: #0056b3;
+            padding: 12px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 14px;
+            border: 1px solid #b3e0ff;
+        }
+        .location-status {
+            font-size: 14px;
+            color: var(--secondary-text-color);
+            margin-bottom: 15px;
+            height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        
+        <div id="login-form-container">
+            <h1>Agentic AI Security</h1>
+            <div class="location-status" id="locationStatus">Fetching location...</div>
+            <form id="login-form">
+                <div class="input-group">
+                    <input type="text" id="user_id" placeholder="User ID (Your Email)" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="password" placeholder="Password" required>
+                </div>
+                <div class="input-group">
+                    <select id="role" required>
+                        <option value="Employee">Employee</option>
+                        <option value="Intern">Intern</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                </div>
+                <input type="hidden" id="latitude" name="latitude">
+                <input type="hidden" id="longitude" name="longitude">
+                <button type="submit" id="loginButton" disabled>Login</button>
+            </form>
+        </div>
+
+        <div id="mfa-form-container" style="display: none;">
+            <h1>Verify Your Identity</h1>
+            <p style="color: var(--secondary-text-color);">A 6-digit code was sent to your email. Please check your inbox.</p>
+            <form id="mfa-form">
+                <div class="input-group">
+                    <input type="text" id="mfa_code" placeholder="6-Digit Code" required maxlength="6" 
+                           pattern="\d{6}" title="Must be a 6-digit number">
+                </div>
+                <button type="submit" id="mfaButton">Verify</button>
+            </form>
+        </div>
+        
+        <div id="message-container" style="display: none;"></div>
+    </div>
+    
+    <script>
+        // --- Get all our elements ---
+        const loginFormContainer = document.getElementById('login-form-container');
+        const mfaFormContainer = document.getElementById('mfa-form-container');
+        const loginForm = document.getElementById('login-form');
+        const mfaForm = document.getElementById('mfa-form');
+        
+        const loginButton = document.getElementById('loginButton');
+        const mfaButton = document.getElementById('mfaButton');
+        
+        const locationStatus = document.getElementById('locationStatus');
+        const latField = document.getElementById('latitude');
+        const lonField = document.getElementById('longitude');
+        const messageContainer = document.getElementById('message-container');
+
+        // --- Geolocation logic (unchanged) ---
+        window.onload = () => {
+            if (!navigator.geolocation) {
+                locationStatus.textContent = 'Geolocation is not supported by your browser.';
+            } else {
+                navigator.geolocation.getCurrentPosition(onLocationSuccess, onLocationError);
+            }
+        };
+        function onLocationSuccess(position) {
+            locationStatus.textContent = 'Location verified.';
+            locationStatus.style.color = 'green';
+            latField.value = position.coords.latitude;
+            lonField.value = position.coords.longitude;
+            loginButton.disabled = false;
+        }
+        function onLocationError(error) {
+            latField.value = "0.0";
+            lonField.value = "0.0";
+            loginButton.disabled = false;
+            locationStatus.textContent = 'Location unavailable. Login as "Unknown" location.';
+            locationStatus.style.color = 'red';
+        }
+
+        // --- UPDATED Login Form Submission ---
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                user_id: document.getElementById('user_id').value,
+                password: document.getElementById('password').value,
+                role: document.getElementById('role').value,
+                latitude: latField.value,
+                longitude: lonField.value
+            };
+            
+            showMessage(null); // Clear old messages
+            loginButton.disabled = true;
+            loginButton.textContent = "Verifying...";
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(formData)
+                });
+                const result = await response.json();
+
+                // --- NEW LOGIC: Check the AI's status ---
+                if (result.status === 'ALLOW') {
+                    // 1. Success: Go to dashboard
+                    window.location.href = '/dashboard';
+                } else if (result.status === 'REQUIRE_MFA') { // <-- This line was fixed
+                    // 2. MFA Required: Show the MFA form
+                    showMessage(result.message, 'info');
+                    loginFormContainer.style.display = 'none';
+                    mfaFormContainer.style.display = 'block';
+                } else {
+                    // 3. Deny/Quarantine: Show error message
+                    // --- THIS IS THE FIX ---
+                    showMessage(result.message, 'error'); // Was result.Message
+                }
+            } catch (error) {
+                showMessage("Could not connect to the server.", 'error');
+            }
+            
+            loginButton.disabled = false;
+            loginButton.textContent = "Login";
+        });
+
+        // --- NEW: MFA Form Submission ---
+        mfaForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const mfa_code = document.getElementById('mfa_code').value;
+            
+            showMessage(null); // Clear old messages
+            mfaButton.disabled = true;
+            mfaButton.textContent = "Checking...";
+
+            try {
+                const response = await fetch('/verify_mfa', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ code: mfa_code })
+                });
+                const result = await response.json();
+
+                if (result.status === 'OK') {
+                    // 1. MFA Success: Go to dashboard
+                    window.location.href = '/dashboard';
+                } else {
+                    // 2. MFA Failed: Show error
+                    showMessage(result.message, 'error'); // This one was also fixed
+                }
+            } catch (error) {
+                showMessage("Could not connect to the server.", 'error');
+            }
+            
+            mfaButton.disabled = false;
+            mfaButton.textContent = "Verify";
+        });
+
+        // --- Helper function to show messages ---
+        function showMessage(message, type = 'error') {
+            if (!message) {
+                messageContainer.style.display = 'none';
+                return;
+            }
+            
+            if (type === 'error') {
+                messageContainer.innerHTML = `<div class="error-message">${message}</div>`;
+            } else {
+                messageContainer.innerHTML = `<div class="info-message">${message}</div>`;
+            }
+            messageContainer.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

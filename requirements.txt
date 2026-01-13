@@ -1,0 +1,17 @@
+# Web Framework & Production Server
+flask
+flask-cors
+gunicorn
+
+# AI Agents
+google-generativeai
+anthropic
+cohere
+python-dotenv
+
+# Geofencing & Location (Agent 1)
+haversine
+requests
+
+# Blockchain Audit (Agent 2)
+web3

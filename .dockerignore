@@ -1,0 +1,22 @@
+# Ignore the local virtual environment
+venv/
+
+# Ignore sensitive secrets
+.env
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore local database files (we want a fresh start in the cloud)
+*.db
+
+# Ignore version control data
+.git/
+.gitignore
+
+# Ignore Docker-related files
+Dockerfile
+.dockerignore
