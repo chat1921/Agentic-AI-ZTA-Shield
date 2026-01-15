@@ -18,4 +18,4 @@ EXPOSE 5000
 
 # Command to run your application
 # Ensure 'app.py' is your main entry point as seen in your project files
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "app:app"]
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--timeout", "90"]
