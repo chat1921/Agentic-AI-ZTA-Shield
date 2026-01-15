@@ -99,35 +99,34 @@ def write_evidence_to_blockchain(event_type, event_data):
 
 # --- Gmail MFA Function ---
 def send_mfa_email(user_email):
-    """
-    Generates a 6-digit code and emails it to the user.
-    """
+    """Generates a 6-digit code and attempts to send it via Email (Safe Mode)."""
+    mfa_code = str(random.randint(100000, 999999))
+    
+    # 1. ALWAYS print the code to logs (so you can see it if email fails)
+    print(f"\n--- MFA Code Generated for {user_email}: {mfa_code} ---\n")
+
     try:
-        sender_email = os.getenv("GMAIL_ADDRESS")
-        password = os.getenv("GMAIL_APP_PASSWORD")
-        
-        if not sender_email or not password:
-            print("!!! CRITICAL: GMAIL_ADDRESS or GMAIL_APP_PASSWORD not set in .env")
-            return None
+        # 2. Attempt to send email using Port 587 (TLS) instead of 465 (SSL)
+        msg = MIMEText(f"Your Agentic AI Security Code is: {mfa_code}")
+        msg['Subject'] = "Security Verification Needed"
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = user_email
 
-        mfa_code = str(secrets.randbelow(1000000)).zfill(6)
-        print(f"--- MFA Code Generated for {user_email}: {mfa_code} ---")
+        # Connect to Gmail using STARTTLS (More cloud-friendly)
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()  # Upgrade connection to secure
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.send_message(msg)
+        server.quit()
         
-        subject = "Your One-Time Verification Code"
-        body = f"Your login verification code is: {mfa_code}\n\nThis code will expire in 10 minutes."
-        message = f"Subject: {subject}\n\n{body}"
+        print(">> Email sent successfully!")
         
-        context = ssl.create_default_context()
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-            server.login(sender_email, password)
-            server.sendmail(sender_email, user_email, message)
-            
-        print("MFA Email successfully sent.")
-        return mfa_code
     except Exception as e:
-        print(f"!!! CRITICAL: Failed to send MFA email: {e}")
-        return None
+        # 3. If email fails, LOG IT but DO NOT CRASH.
+        print(f">> WARNING: Email failed to send. Error: {e}")
+        print(f">> You can still login using the code printed above: {mfa_code}")
 
+    return mfa_code
 # --- Database Helper Functions ---
 def get_db():
     db = getattr(g, '_database', None)
