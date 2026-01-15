@@ -12,10 +12,14 @@ from dotenv import load_dotenv
 from web3 import Web3
 from eth_account import Account
 
+
 # --- Import libraries for Email MFA ---
 import smtplib
 import ssl
 import secrets
+import random
+import smtplib
+from email.mime.text import MIMEText
 
 # --- Import all 3 Agents ---
 from agents import run_login_agent, run_scribe_agent, run_threat_guardian_agent
