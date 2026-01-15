@@ -27,8 +27,14 @@ load_dotenv()  # This loads variables from .env if you are running locally
 
 # --- CONFIGURATION (Fixes "NameError") ---
 # These lines read the settings from Render/Environment
-SENDER_EMAIL = os.getenv("SENDER_EMAIL")
-SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
+# --- CONFIGURATION ---
+# We use the exact names from your Render Environment screenshot
+SENDER_EMAIL = os.getenv("GMAIL_ADDRESS")
+SENDER_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+
+# This ensures that even if Render is slow, the variables are "defined"
+if SENDER_EMAIL is None:
+    SENDER_EMAIL = "blockagentllm@gmail.com"
 
 # --- Import all 3 Agents ---
 from agents import run_login_agent, run_scribe_agent, run_threat_guardian_agent
