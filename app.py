@@ -1,29 +1,37 @@
+import random
+import smtplib
+from email.mime.text import MIMEText
 import os
 import datetime
 import json
 import sqlite3
 import requests
 import hashlib
+import smtplib
+import ssl
+import secrets
+import random
 from math import radians, sin, cos, sqrt, atan2
 from queue import Queue
+from email.mime.text import MIMEText
+
+# --- Third Party Imports ---
 from flask import (Flask, Response, jsonify, redirect, render_template, 
                    request, session, g)
 from dotenv import load_dotenv
 from web3 import Web3
 from eth_account import Account
 
+# --- Load Environment Variables ---
+load_dotenv()  # This loads variables from .env if you are running locally
 
-# --- Import libraries for Email MFA ---
-import smtplib
-import ssl
-import secrets
-import random
-import smtplib
-from email.mime.text import MIMEText
+# --- CONFIGURATION (Fixes "NameError") ---
+# These lines read the settings from Render/Environment
+SENDER_EMAIL = os.getenv("SENDER_EMAIL")
+SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 
 # --- Import all 3 Agents ---
 from agents import run_login_agent, run_scribe_agent, run_threat_guardian_agent
-
 # --- Initialization ---
 load_dotenv()
 app = Flask(__name__)
@@ -103,32 +111,41 @@ def write_evidence_to_blockchain(event_type, event_data):
 
 # --- Gmail MFA Function ---
 def send_mfa_email(user_email):
-    """Generates a 6-digit code and attempts to send it via Email (Safe Mode)."""
+    """
+    Generates a 6-digit code, prints it to logs for debugging, 
+    and attempts to send it via Gmail.
+    """
+    # 1. Generate the 6-digit code
     mfa_code = str(random.randint(100000, 999999))
     
-    # 1. ALWAYS print the code to logs (so you can see it if email fails)
-    print(f"\n--- MFA Code Generated for {user_email}: {mfa_code} ---\n")
+    # 2. FORCE PRINT TO LOGS (The "Backdoor" for testing)
+    # flush=True ensures Render shows this line the second it happens.
+    print(f"\n==================================================", flush=True)
+    print(f"SECURITY ALERT: MFA CODE FOR {user_email} IS: {mfa_code}", flush=True)
+    print(f"==================================================\n", flush=True)
 
     try:
-        # 2. Attempt to send email using Port 587 (TLS) instead of 465 (SSL)
+        # 3. Prepare the Email Message
         msg = MIMEText(f"Your Agentic AI Security Code is: {mfa_code}")
-        msg['Subject'] = "Security Verification Needed"
+        msg['Subject'] = "Security Verification - Agentic AI ZTA"
         msg['From'] = SENDER_EMAIL
         msg['To'] = user_email
 
-        # Connect to Gmail using STARTTLS (More cloud-friendly)
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()  # Upgrade connection to secure
+        # 4. Connect to Gmail using TLS (Port 587)
+        # Timeout is set to 20s to prevent the app from hanging forever
+        server = smtplib.SMTP("smtp.gmail.com", 587, timeout=20)
+        server.starttls()  # Upgrade the connection to secure
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
         server.send_message(msg)
         server.quit()
         
-        print(">> Email sent successfully!")
+        print(f">> SUCCESS: MFA Email sent to {user_email}", flush=True)
         
     except Exception as e:
-        # 3. If email fails, LOG IT but DO NOT CRASH.
-        print(f">> WARNING: Email failed to send. Error: {e}")
-        print(f">> You can still login using the code printed above: {mfa_code}")
+        # 5. Handle Errors Safely
+        # If email fails, we log why, but we DO NOT let the app crash.
+        print(f">> EMAIL ERROR: {str(e)}", flush=True)
+        print(f">> WORKAROUND: Use the code printed in the logs above to log in.", flush=True)
 
     return mfa_code
 # --- Database Helper Functions ---
