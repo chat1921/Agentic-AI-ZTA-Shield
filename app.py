@@ -504,53 +504,72 @@ def stream_alerts():
     def event_stream():
         while True: yield f"data: {alert_queue.get()}\n\n"
     return Response(event_stream(), mimetype='text/event-stream')
+# --- [Keep your existing imports and top code] ---
+
 def init_database():
-    db = sqlite3.connect(DATABASE)
-    cursor = db.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS chats (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL,
-            title TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id INTEGER NOT NULL,
-            role TEXT NOT NULL, content TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (chat_id) REFERENCES chats (id));''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            true_role TEXT NOT NULL,
-            last_location_status TEXT,
-            last_login TIMESTAMP,
-            last_device_fingerprint TEXT,
-            is_quarantined BOOLEAN DEFAULT 0,
-            failed_attempts INTEGER DEFAULT 0,
-            failed_role_attempts INTEGER DEFAULT 0   
-        );''')
     try:
+        # Connect to the database
+        db = sqlite3.connect(DATABASE) # Ensure 'DATABASE' variable is defined at top of file
+        cursor = db.cursor()
+        
+        # 1. Create Chats Table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS chats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL,
+                title TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
+        
+        # 2. Create Messages Table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id INTEGER NOT NULL,
+                role TEXT NOT NULL, content TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (chat_id) REFERENCES chats (id));''')
+        
+        # 3. Create Users Table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                true_role TEXT NOT NULL,
+                last_location_status TEXT,
+                last_login TIMESTAMP,
+                last_device_fingerprint TEXT,
+                is_quarantined BOOLEAN DEFAULT 0,
+                failed_attempts INTEGER DEFAULT 0,
+                failed_role_attempts INTEGER DEFAULT 0   
+            );''')
+        
+        # 4. Insert Default Users (Admin, Employee, Intern)
         default_hash = hashlib.sha256("password123".encode()).hexdigest()
-        cursor.execute('''
+        
+        users_to_add = [
+            ('admin_user', default_hash, 'Admin', 'SafeZone'),
+            ('employee_user', default_hash, 'Employee', 'SafeZone'),
+            ('intern_user', default_hash, 'Intern', 'SafeZone')
+        ]
+        
+        cursor.executemany('''
             INSERT OR IGNORE INTO users (user_id, password_hash, true_role, last_location_status)
             VALUES (?, ?, ?, ?)
-            ''', ('admin_user', default_hash, 'Admin', 'SafeZone'))
-        cursor.execute('''
-            INSERT OR IGNORE INTO users (user_id, password_hash, true_role, last_location_status)
-            VALUES (?, ?, ?, ?)
-            ''', ('employee_user', default_hash, 'Employee', 'SafeZone'))
-        cursor.execute('''
-            INSERT OR IGNORE INTO users (user_id, password_hash, true_role, last_location_status)
-            VALUES (?, ?, ?, ?)
-            ''', ('intern_user', default_hash, 'Intern', 'SafeZone'))
-        print("Default users created or already exist.")
-    except sqlite3.IntegrityError:
-        print("Default users already exist.")
-    db.commit()
-    db.close()
-    print("Database initialized successfully.")
+            ''', users_to_add)
+
+        db.commit()
+        print("Database initialized successfully with default users.")
+        
+    except Exception as e:
+        print(f"Database initialization error: {e}")
+    finally:
+        # Always close the connection
+        if 'db' in locals():
+            db.close()
+
+# --- CRITICAL CHANGE: Run this OUTSIDE the main block ---
+# This ensures it runs on Render/Cloud when Gunicorn loads the app
+init_database()
+# ---------------------------------------------------------
 
 if __name__ == '__main__':
-    init_database()
-    print("Starting Flask server with HTTPS (SSL)...")
+    print("Starting Flask server...")
+    # Note: On Render, SSL is handled automatically, so 'adhoc' is only for local
     app.run(debug=True, port=5000, ssl_context='adhoc')
